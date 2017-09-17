@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:json="http://www.mulesoft.org/schema/mule/json" xmlns:mulexml="http://www.mulesoft.org/schema/mule/xml" xmlns:email="http://www.mulesoft.org/schema/mule/email" xmlns:metadata="http://www.mulesoft.org/schema/mule/metadata" xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns:db="http://www.mulesoft.org/schema/mule/db" xmlns:file="http://www.mulesoft.org/schema/mule/file" xmlns:dw="http://www.mulesoft.org/schema/mule/ee/dw" xmlns:batch="http://www.mulesoft.org/schema/mule/batch" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:spring="http://www.springframework.org/schema/beans" 
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/db http://www.mulesoft.org/schema/mule/db/current/mule-db.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/file http://www.mulesoft.org/schema/mule/file/current/mule-file.xsd
+http://www.mulesoft.org/schema/mule/batch http://www.mulesoft.org/schema/mule/batch/current/mule-batch.xsd
+http://www.mulesoft.org/schema/mule/ee/dw http://www.mulesoft.org/schema/mule/ee/dw/current/dw.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/xml http://www.mulesoft.org/schema/mule/xml/current/mule-xml.xsd
+http://www.mulesoft.org/schema/mule/email http://www.mulesoft.org/schema/mule/email/current/mule-email.xsd
+http://www.mulesoft.org/schema/mule/json http://www.mulesoft.org/schema/mule/json/current/mule-json.xsd">
+    <file:connector name="File"   readFromDirectory="C:\Project\MuleSoft\bathchsoruce"   autoDelete="false" streaming="true" validateConnections="true" doc:name="File"/>
+    <http:proxy name="Proxy_Configuration" host="proxy.ros.com" port="80" doc:name="Proxy Configuration"/>
+    <db:oracle-config name="Oracle_Configuration" host="localhost" port="1521" instance="XE" user="hr" password="hr" doc:name="Oracle Configuration"/>
+    <batch:job name="mulebatchprocessingBatch">
+        <batch:input>
+            <file:inbound-endpoint path="C:\Project\MuleSoft\bathchsoruce" moveToDirectory="C:\Project\MuleSoft\bathchsoruceOutput" connector-ref="File" responseTimeout="10000" doc:name="ReadFile"/>
+            <dw:transform-message doc:name="Transform Message"  metadata:id="b839da90-6ca6-4b51-b336-3333c5d1857c">
+                <dw:input-payload mimeType="application/csv" doc:sample="C:\Project\MuleSoft\MuleProjectResource\batchprocessing\mulebatchprocessing\students.csv"/>
+                <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+payload map ((payload01 , indexOfPayload01) -> {
+	Id: payload01.Id as :number,
+	name: payload01.Name,
+	course: payload01.Course
+})
+]]></dw:set-payload>
+            </dw:transform-message>
+
+            <logger message="#[payload]" level="INFO" doc:name="Logger"/>
+
+        </batch:input>
+        <batch:process-records>
+            <batch:step name="Batch_Step">
+                <db:insert config-ref="Oracle_Configuration" doc:name="Database">
+                    <db:parameterized-query><![CDATA[insert into students(id,name,course) values (#[message.payload.Id],#[message.payload.name],#[message.payload.course])]]></db:parameterized-query>
+                </db:insert>
+
+                <logger level="INFO" doc:name="Logger"/>
+            </batch:step>
+        </batch:process-records>
+        <batch:on-complete>
+            <logger level="INFO" doc:name="Logger"/>
+        </batch:on-complete>
+    </batch:job>
+</mule>
